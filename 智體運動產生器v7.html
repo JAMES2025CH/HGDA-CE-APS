@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智體教案生成器</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用思源黑體或系統預設字體以確保中文顯示優美 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #eef2f8; /* 更淺的背景色 */
+        }
+        /* 定義主色調 */
+        .primary-color { background-color: #1e40af; } /* 深藍色 */
+        .primary-text { color: #1e40af; } 
+        .input-style {
+            border: 2px solid #cbd5e1; /* 淺灰邊框 */
+            transition: all 0.3s;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+        }
+        .input-style:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* 統一教案列表項目的視覺風格 */
+        .lesson-list-item, .note-list-item {
+            padding: 0.75rem 1rem;
+            border-left: 5px solid #60a5fa; /* 藍色強調邊 */
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            background-color: #f7f9ff; /* 淺淺的藍色背景 */
+            border-radius: 0.375rem;
+            font-size: 0.95rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .note-list-item strong {
+            color: #1e40af; 
+        }
+        /* 活動引導技巧專用樣式 */
+        .guidance-box {
+            border: 1px solid #fdba74; /* 橘色邊框 */
+            background-color: #fff7ed; /* 淺橘色背景 */
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0.5rem;
+            color: #9a3412; /* 深橘色文字 */
+        }
+        .suggestion-chip {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .suggestion-chip:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .music-recommendation {
+            border: 1px solid #d1d5db;
+            background-color: #f9fafb;
+            padding: 1rem;
+            margin-top: 0.5rem;
+            border-radius: 0.5rem;
+        }
+        .music-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+        .music-item:last-child {
+            border-bottom: none;
+        }
+        /* 動作說明折疊按鈕樣式 */
+        .collapse-btn {
+            background-color: #4f46e5;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .collapse-btn:hover {
+            background-color: #4338ca;
+        }
+        .collapse-icon {
+            margin-right: 8px;
+        }
+        /* 教案內容容器 */
+        .lesson-plan-container {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .lesson-section-title {
+            font-size: 1.5rem; 
+            font-weight: 800; /* 更粗的字體 */
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            color: #1e40af; 
+            border-bottom: 3px solid #bfdbfe; /* 更明顯的底線 */
+            padding-bottom: 6px;
+        }
+        .lesson-subsection-title {
+            font-size: 1.25rem; 
+            font-weight: 700; 
+            margin-top: 1.25rem;
+            color: #374151; 
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto lesson-plan-container overflow-hidden">
+        
+        <!-- Header -->
+        <header class="primary-color text-white p-6 md:p-8 -mx-1.5 -mt-1.5 rounded-t-lg shadow-md">
+            <h1 class="3xl font-bold mb-1">🧠 智體教案生成助手</h1>
+            <p class="text-sm opacity-90">輸入您的需求，AI 將依據您的專業資料庫生成實用教案。 <span class="font-bold">(C) 鄭智宏 HGDA</span></p>
+        </header>
+
+        <!-- Input Section -->
+        <section class="p-6 md:p-8 space-y-6 bg-white border-b border-slate-200">
+            <h2 class="2xl font-semibold primary-text mb-4 border-l-4 border-indigo-500 pl-3">選擇課程設計要素</h2>
+
+            <!-- 主題 (從資料庫建議中選擇) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label for="topic" class="block text-sm font-medium text-gray-700 mb-1">1. 活動主題</label>
+                    <select id="topic" class="input-style w-full p-3 rounded-lg text-gray-700 appearance-none bg-white">
+                        <option value="">-- 請選擇一個主題 --</option>
+                    </select>
+                </div>
+                <!-- 目標 (從您的目標中選擇) -->
+                <div>
+                    <label for="goal" class="block text-sm font-medium text-gray-700 mb-1">2. 主要訓練目標</label>
+                    <select id="goal" class="input-style w-full p-3 rounded-lg text-gray-700 appearance-none bg-white">
+                        <option value="">-- 請選擇一個目標 --</option>
+                    </select>
+                </div>
+                 <!-- 輔具 (開放輸入) -->
+                <div>
+                    <label for="equipment" class="block text-sm font-medium text-gray-700 mb-1">3. 使用的輔具</label>
+                    <input type="text" id="equipment" value="無" placeholder="預設: 無 (可更改為彈力帶、瑜珈球等)" class="input-style w-full p-3 rounded-lg text-gray-700">
+                </div>
+            </div>
+
+            <!-- 輔具推薦按鈕和建議 -->
+            <div class="space-y-2">
+                <button id="recommendBtn" class="bg-yellow-500 text-white font-bold text-sm py-2 px-4 rounded-lg shadow-md hover:bg-yellow-600 transition duration-300 whitespace-nowrap flex items-center justify-center">
+                    <span id="recommendBtnText">✨ 推薦創意輔具</span>
+                    <div id="recommendLoading" class="loading-animation hidden"></div>
+                </button>
+                <div id="equipmentSuggestions" class="flex flex-wrap gap-2 text-sm min-h-[24px]">
+                    <!-- 輔具建議顯示區 -->
+                </div>
+            </div>
+            
+
+            <!-- 生成按鈕 -->
+            <button id="generateBtn" class="w-full flex items-center justify-center primary-color text-white font-extrabold text-lg py-4 px-4 rounded-lg shadow-xl hover:bg-blue-800 transition duration-300">
+                <div id="loadingIndicator" class="loading-animation hidden mr-2"></div>
+                <span id="btnText">🚀 一鍵生成教案</span>
+            </button>
+
+            <div id="error-message" class="text-red-600 text-sm mt-3 hidden bg-red-100 p-2 rounded-lg border border-red-300"></div>
+        </section>
+
+        <!-- Output Section -->
+        <section class="p-6 md:p-8 bg-gray-50">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="2xl font-semibold primary-text border-l-4 border-indigo-500 pl-3">教案生成結果</h2>
+                <div class="flex space-x-2">
+                    <!-- 複製按鈕 (原配樂按鈕已移除) -->
+                    <button id="copyBtn" class="bg-green-500 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-600 transition duration-300 hidden flex items-center justify-center">
+                        📋 複製教案內容
+                    </button>
+                </div>
+            </div>
+            
+            <div id="lessonPlanOutput" class="lesson-plan-container min-h-60 relative">
+                <p class="text-gray-500 italic" id="placeholder-text">輸入教案要素並點擊「一鍵生成教案」來產生您的專屬智體運動教案。</p>
+                
+                <div id="generatedContent" class="hidden"></div>
+
+                <!-- 動作說明折疊按鈕 -->
+                <button id="toggleNotesBtn" class="collapse-btn w-full hidden">
+                    <span class="collapse-icon">⬇️</span> 顯示動作說明
+                </button>
+
+                <!-- 動作教練註解區 (可折疊的內容) -->
+                <div id="notesContainer" class="mt-6 hidden">
+                    <div id="notesOutput" class="text-gray-700 space-y-3">
+                        <h3 class="lesson-section-title primary-text">動作說明</h3> 
+                        <div id="notesContent"></div>
+                    </div>
+                </div>
+
+                <!-- 複製成功提示 -->
+                <div id="copySuccess" class="absolute top-0 right-0 m-4 px-3 py-1 bg-green-500 text-white rounded-md text-sm shadow-lg hidden opacity-0 transition-opacity duration-500">
+                    ✅ 複製成功！
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script type="module">
+        // ====================================================================
+        // 核心資料庫 (80% 內容來源) - 擴充節慶與生活主題
+        // ====================================================================
+        const coreData = [
+            // 新增節慶主題
+            {
+                name: "新年拳",
+                topic: "節慶主題 (新年)",
+                goal: "複雜專注力",
+                equipment: "紅包/鞭炮圖卡",
+                description: "結合新年走春、放鞭炮、領紅包等動作，訓練肢體協調與複雜專注力，增添節慶歡樂。",
+                action_set: ["舞龍舞獅 (雙手畫圈)", "放鞭炮 (雙手拍手向下壓)", "拜年作揖 (雙手胸前作揖)", "發紅包 (雙手向前推出)"]
+            },
+            {
+                name: "尾牙拳",
+                topic: "節慶主題 (尾牙)",
+                goal: "反應能力",
+                equipment: "無",
+                description: "模擬年終聚會、抽獎、致詞等活動，訓練短期記憶與反應速度。",
+                action_set: ["舉杯(單子上舉)", "抽獎(雙手抓取)", "致詞(單手前伸)", "原地踏步"]
+            },
+            {
+                name: "清明拳",
+                topic: "節慶主題 (清明)",
+                goal: "邏輯判斷",
+                equipment: "無",
+                description: "結合掃墓、踏青、放風箏等動作，訓練關節活動度、短期記憶和邏輯判斷。",
+                action_set: ["掃墓合十 (雙手合十)", "去踏青 (原地踏步)", "放風箏 (雙手握拳舉高)", "草仔粿 (前臂旋前旋後)"]
+            },
+            // 既有節慶主題
+            {
+                name: "聖誕拳",
+                topic: "節慶主題 (聖誕)",
+                goal: "短期記憶",
+                equipment: "無",
+                description: "結合聖誕樹、送禮物、報佳音、唱詩歌等動作，訓練上肢肌力與抑制控制能力。",
+                action_set: ["聖誕樹(雙手高舉+抬膝)", "送禮物(雙手前推+前點)", "報佳音(雙手側擺+側點)", "收禮物(雙手環抱)"]
+            },
+            {
+                name: "冬至拳",
+                topic: "節慶主題 (冬至)",
+                goal: "全身協調",
+                equipment: "無",
+                description: "以搓湯圓、甜米糕、薑母鴨、燉排骨等動作為核心，強化全身協調與反應速度。",
+                action_set: ["搓湯圓(雙手胸前繞圈)", "甜米糕(雙手臂伸直切塊)", "羊肉爐(單腳抬膝+上舉)", "燉排骨(雙手擴胸)"]
+            },
+            {
+                name: "元宵拳",
+                topic: "節慶主題 (元宵)",
+                goal: "短期記憶",
+                equipment: "無",
+                description: "5個口令動作：買菜、做元宵、掛燈籠、踩高蹺、吃湯圓。訓練動作切換與順序記憶。",
+                action_set: ["去買菜(踏步+單手畫圈)", "做元宵(雙手畫圈)", "掛燈籠(單手上舉)", "踩高蹺(抬膝)", "吃湯圓(雙手環抱)"]
+            },
+            {
+                name: "端午拳",
+                topic: "節慶主題 (端午)",
+                goal: "複雜專注力",
+                equipment: "無",
+                description: "結合端午文化設計的6個動作：粽子、龍舟、艾草、香包、白蛇、雄黃。進階挑戰為做下一個或上一個動作，訓練記憶與邏輯判斷。",
+                action_set: ["粽子(雙手前推)", "龍舟(雙手側擺)", "艾草(雙手高舉)", "香包(雙手繞圈)", "踏步"]
+            },
+            {
+                name: "中秋拳",
+                topic: "節慶主題 (中秋)",
+                goal: "記憶力,反應能力",
+                equipment: "無",
+                description: "結合郊遊、賞月、月餅、柚子、烤肉、螃蟹。國台語雙語言對應動作，訓練長短期記憶與反應。",
+                action_set: ["拜拜(合十)", "賞月(雙手畫圓)", "吃月餅(雙手胸前)", "吃柚子(雙手側舉)", "原地踏步"]
+            },
+            // 生活應用
+            {
+                name: "ADL生活功能拳",
+                topic: "生活應用",
+                goal: "生活上的運用",
+                equipment: "無/椅子",
+                description: "回想一日生活動作(刷牙、洗臉、穿衣等)，設計一連串動作記憶。訓練記憶力與肢體協調。",
+                action_set: ["刷牙(上下擺動)", "洗臉(畫圈)", "穿衣(上舉下拉)", "吃飯(胸前繞圈)", "原地踏步"]
+            },
+            {
+                name: "美食健康操",
+                topic: "生活應用",
+                goal: "記憶力,語言表達",
+                equipment: "無",
+                description: "結合六大飲食類別，搭配動作口令(例如：水果一餐一拳頭)，訓練記憶、反應及語言表達。",
+                action_set: ["牛奶(輪流舉杯)", "水果(輪流出拳)", "青菜(擊掌)", "全穀(震盪掌)", "踏步"]
+            },
+            // 基礎體適能
+            {
+                name: "出去玩",
+                topic: "心肺",
+                goal: "複雜專注力",
+                equipment: "無",
+                description: "模擬搭乘公車、飛機等動作，結合社會認知、短期記憶和複雜注意力訓練，要求全程踏步。",
+                action_set: ["踏步", "單手上舉+腿上抬 (搭公車)", "雙臂側舉 (大飛機)", "單腳前點+手前推 (搭船)"]
+            },
+            {
+                name: "蓋房子拳",
+                topic: "肌力",
+                goal: "認知執行能力",
+                equipment: "無/椅子",
+                description: "坐姿上肢肌力訓練，口令包括蓋房子、打地基、疊磚頭、打水泥、抹牆壁。強調聽口令與看動作的獨立執行。",
+                action_set: ["蓋房子 (雙手上舉)", "打地基 (雙手交叉開合)", "疊磚頭 (雙手胸前交疊)", "打水泥 (雙手外旋)"]
+            },
+            {
+                name: "彈力帶5-搶救恐龍蛋",
+                topic: "協調",
+                goal: "手眼協調",
+                equipment: "彈力帶, 氣球, 小球",
+                description: "單人或雙人使用彈力帶撐開，將球放置其中並傳遞，訓練上肢肌力、感知能力及手眼協調。",
+                action_set: ["單人撐開彈力帶", "雙手協同運球", "傳遞給下一位"]
+            },
+            {
+                name: "水果拳",
+                topic: "記憶",
+                goal: "反應能力",
+                equipment: "無",
+                description: "示範三種水果動作及關係，進行比大比多、比少比小問答。進階要求連續回答，強化反應力與專注力。",
+                action_set: ["蘋果 (硬梆梆)", "香蕉 (軟趴趴)", "桃子 (紅屁股)", "踏步"]
+            },
+            {
+                name: "拍手踏步8下去",
+                topic: "計算",
+                goal: "計算能力",
+                equipment: "無",
+                description: "以8拍為一循環，老師拍手學生對應踏步，或老師拍踏混合，學生接續對應。訓練專注力與計算能力。",
+                action_set: ["純拍手", "純踏步", "拍手加踏步", "接續對應動作"]
+            }
+        ];
+
+        // 核心訓練目標 (對應目標下拉選單)
+        const coreGoals = [
+            "體適能及認知功能",
+            "生活上的運用",
+            "大腦功能區域的改善"
+        ];
+        
+        // ====================================================================
+        // UI 元素與狀態管理
+        // ====================================================================
+        const topicSelect = document.getElementById('topic');
+        const goalSelect = document.getElementById('goal');
+        const equipmentInput = document.getElementById('equipment');
+        const generateBtn = document.getElementById('generateBtn');
+        const btnText = document.getElementById('btnText');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const lessonPlanOutput = document.getElementById('lessonPlanOutput');
+        const generatedContent = document.getElementById('generatedContent');
+        const placeholderText = document.getElementById('placeholder-text');
+        const errorMessage = document.getElementById('error-message');
+        const copyBtn = document.getElementById('copyBtn');
+        const copySuccess = document.getElementById('copySuccess');
+        const notesContainer = document.getElementById('notesContainer'); // 可折疊容器
+        const notesContent = document.getElementById('notesContent'); 
+        const recommendBtn = document.getElementById('recommendBtn');
+        const recommendBtnText = document.getElementById('recommendBtnText');
+        const recommendLoading = document.getElementById('recommendLoading');
+        const equipmentSuggestions = document.getElementById('equipmentSuggestions');
+        const toggleNotesBtn = document.getElementById('toggleNotesBtn');
+        
+        // 原配樂相關元素已移除
+        // const recommendMusicBtn = document.getElementById('recommendMusicBtn');
+        // const musicOutput = document.getElementById('musicOutput');
+        // const musicContent = document.getElementById('musicContent');
+
+        let lastGeneratedMarkdown = ""; // 儲存教案主體原始 Markdown 文字
+        let lastGeneratedNotes = ""; // 儲存專業註解原始文字
+        let lastGeneratedMusic = ""; // 儲存音樂推薦純文字 (已移除，但保留變數方便複製功能)
+
+        // ====================================================================
+        // 日期與選擇器填充邏輯
+        // ====================================================================
+
+        function getMonthDifference(currentMonth, targetMonth) {
+            let diff = targetMonth - currentMonth;
+            if (diff < 0) {
+                diff += 12;
+            }
+            return diff;
+        }
+
+        function sortTopicsByProximity(uniqueTopics) {
+            const now = new Date();
+            const currentMonth = now.getMonth(); 
+            const currentDay = now.getDate(); 
+
+            const holidayMonths = {
+                // 月份 (0-11), 日期
+                "節慶主題 (新年)": [0, 25], 
+                "節慶主題 (尾牙)": [0, 20],   
+                "節慶主題 (清明)": [3, 5],    
+                "節慶主題 (聖誕)": [11, 25],
+                "節慶主題 (冬至)": [11, 22],
+                "節慶主題 (元宵)": [1, 15],
+                "節慶主題 (端午)": [5, 5],
+                "節慶主題 (中秋)": [8, 15],
+            };
+
+            const topicScores = uniqueTopics.map(topic => {
+                if (topic.startsWith("節慶主題")) {
+                    const [targetMonth, targetDay] = holidayMonths[topic] || [0, 1];
+                    let score = getMonthDifference(currentMonth, targetMonth);
+
+                    if (targetMonth === currentMonth) {
+                        score = (targetDay >= currentDay) ? 0 : 12;
+                    }
+                    
+                    return { topic, score: score - 100 };
+                }
+                return { topic, score: 100 };
+            }).sort((a, b) => {
+                if (a.score !== b.score) {
+                    return a.score - b.score;
+                }
+                return a.topic.localeCompare(b.topic);
+            });
+
+            return topicScores.map(item => item.topic);
+        }
+
+        function populateSelectors() {
+            const uniqueTopics = [...new Set(coreData.map(item => item.topic))];
+            const sortedTopics = sortTopicsByProximity(uniqueTopics);
+            
+            sortedTopics.forEach(topic => {
+                const option = document.createElement('option');
+                option.value = topic;
+                option.textContent = topic;
+                topicSelect.appendChild(option);
+            });
+
+            coreGoals.forEach(goal => {
+                const option = document.createElement('option');
+                option.value = goal;
+                option.textContent = goal;
+                goalSelect.appendChild(option);
+            });
+        }
+        
+        populateSelectors();
+
+
+        // ====================================================================
+        // Gemini API 呼叫核心函數 (精簡)
+        // ====================================================================
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent";
+        
+        // 🚨 內嵌 API 金鑰 🚨
+        const API_KEY = "AIzaSyDSZcE7HIKUrKizouoQy0OrLoA8TChN7pY"; 
+
+        async function callStructuredApi(userQuery, generationConfig, systemInstruction = null) {
+            if (!API_KEY || API_KEY === "") {
+                throw new Error("API 金鑰未設定，請檢查程式碼中 API_KEY 變數。");
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                generationConfig: generationConfig
+            };
+            
+            if (systemInstruction) {
+                payload.systemInstruction = systemInstruction;
+            }
+
+            const maxRetries = 5;
+            let delay = 1000;
+            const apiUrlWithKey = `${API_URL}?key=${API_KEY}`;
+            
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrlWithKey, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Request Failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (jsonText) {
+                         // 嘗試解析 JSON
+                        try {
+                            const parsed = JSON.parse(jsonText);
+                            return parsed; // 成功解析，返回
+                        } catch (e) {
+                            // 如果解析失敗，視為模型輸出格式錯誤，繼續重試
+                            if (i < maxRetries - 1) {
+                                console.warn(`JSON parsing failed on attempt ${i + 1}. Retrying...`);
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                delay *= 2;
+                                continue; 
+                            }
+                            throw new Error("模型返回了無效的 JSON 格式。");
+                        }
+                    }
+
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; 
+                    } else {
+                        throw new Error("API 請求成功但內容為空，已達到最大重試次數。");
+                    }
+                } catch (error) {
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    } else {
+                        throw new Error(`API 請求失敗或連線錯誤: ${error.message}`);
+                    }
+                }
+            }
+            throw new Error("達到最大重試次數，API 請求失敗。");
+        }
+
+        // ====================================================================
+        // UI 狀態輔助函數
+        // ====================================================================
+
+        function setUiState(isGenerating, targetElement, buttonText) {
+            targetElement.disabled = isGenerating;
+            
+            const loadingDiv = targetElement.querySelector('.loading-animation') || targetElement.querySelector('#recommendLoading');
+            const textSpan = targetElement.querySelector('span') || targetElement;
+            
+            if (isGenerating) {
+                targetElement.classList.add('opacity-70', 'cursor-not-allowed');
+                textSpan.classList.add('hidden');
+                if (loadingDiv) loadingDiv.classList.remove('hidden');
+                targetElement.textContent = buttonText;
+                if (loadingDiv) targetElement.prepend(loadingDiv);
+            } else {
+                targetElement.classList.remove('opacity-70', 'cursor-not-allowed');
+                if (loadingDiv) loadingDiv.classList.add('hidden');
+                textSpan.classList.remove('hidden');
+                targetElement.textContent = buttonText;
+            }
+        }
+
+        // ====================================================================
+        // 動作說明折疊功能
+        // ====================================================================
+
+        toggleNotesBtn.addEventListener('click', () => {
+            const isHidden = notesContainer.classList.contains('hidden');
+            const icon = toggleNotesBtn.querySelector('.collapse-icon');
+
+            if (isHidden) {
+                notesContainer.classList.remove('hidden');
+                toggleNotesBtn.textContent = '▲ 隱藏動作說明';
+                icon.textContent = '▲';
+            } else {
+                notesContainer.classList.add('hidden');
+                toggleNotesBtn.textContent = '⬇️ 顯示動作說明';
+                icon.textContent = '⬇️';
+            }
+            // 這裡不需要 toggleNotesBtn.prepend(icon);，因為 textContent 會重置元素內容
+        });
+
+        // ====================================================================
+        // 複製功能 - 修正為 execCommand('copy')
+        // ====================================================================
+
+        copyBtn.addEventListener('click', () => {
+            // 合併教案主體、動作說明和音樂推薦，並移除 Markdown 格式
+            let combinedContent = lastGeneratedMarkdown;
+            if (lastGeneratedNotes) {
+                // 合併動作說明到複製內容中
+                combinedContent += `\n\n--- 動作說明 ---\n${lastGeneratedNotes}`;
+            }
+            // lastGeneratedMusic 已移除，不影響此處。
+
+            // 1. 移除 Markdown 符號
+            let plainText = combinedContent
+                .replace(/^#+\s/gm, '\n')         // 轉換 # 標題為空行，增加分段
+                .replace(/\*\*(.*?)\*\*/g, '$1') // 移除 **粗體** 符號
+                .replace(/^- /gm, ' - ')        // 轉換列表符號
+                .replace(/##\s*/g, '')          // 移除二級標題符號
+                .replace(/\n\s*\n/g, '\n\n')    // 標準化多餘的空行
+                .trim();
+            
+            // 2. 處理複製
+            try {
+                // 使用 document.execCommand('copy') 來確保在 iFrame 或受限環境下的相容性
+                const textarea = document.createElement('textarea');
+                textarea.value = plainText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                // 顯示成功提示
+                copySuccess.classList.remove('hidden');
+                copySuccess.classList.add('opacity-100');
+                setTimeout(() => {
+                    copySuccess.classList.remove('opacity-100');
+                    setTimeout(() => { copySuccess.classList.add('hidden'); }, 500); 
+                }, 1500);
+
+            } catch (err) {
+                console.error('複製失敗:', err);
+                // 即使 execCommand 失敗，也提示使用者可以手動複製
+                errorMessage.textContent = '複製失敗。請嘗試手動選取教案內容。';
+                errorMessage.classList.remove('hidden');
+            }
+        });
+
+        // ====================================================================
+        // 新增功能 1: 輔具創意推薦 (已修復)
+        // ====================================================================
+
+        recommendBtn.addEventListener('click', async () => {
+            const topic = topicSelect.value;
+            const goal = goalSelect.value;
+
+            if (!topic || !goal) {
+                errorMessage.textContent = "請先選擇「活動主題」和「主要訓練目標」才能推薦輔具！";
+                errorMessage.classList.remove('hidden');
+                return;
+            } else {
+                errorMessage.classList.add('hidden');
+            }
+
+            // 🎯 修正點：在操作 toggleNotesBtn 前，先判斷它是否存在
+            if (toggleNotesBtn) {
+                // 重置狀態：隱藏內容，並確保按鈕文字為收合狀態
+                notesContainer.classList.add('hidden');
+                toggleNotesBtn.textContent = '⬇️ 顯示動作說明';
+                const icon = toggleNotesBtn.querySelector('.collapse-icon');
+                if (icon) icon.textContent = '⬇️';
+            }
+
+
+            setUiState(true, recommendBtn, "AI 正在思考中...");
+            equipmentSuggestions.innerHTML = `<p class="text-gray-500">正在思考創意輔具中...</p>`;
+
+            const userQuery = `根據主題: ${topic} 和訓練目標: ${goal}，請推薦 3 個容易取得、安全性高且富有創意的輔助器材（例如：報紙、毛巾、瑜珈球）。`;
+            const schema = {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        "suggestions": {
+                            type: "ARRAY",
+                            items: { type: "STRING" }
+                        }
+                    },
+                    required: ["suggestions"]
+                }
+            };
+            
+            try {
+                const result = await callStructuredApi(userQuery, schema);
+                
+                if (result && result.suggestions) {
+                    equipmentSuggestions.innerHTML = '';
+                    result.suggestions.forEach(suggestion => {
+                        const chip = document.createElement('span');
+                        chip.className = 'suggestion-chip bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:bg-yellow-200';
+                        chip.textContent = suggestion;
+                        chip.onclick = () => {
+                            equipmentInput.value = suggestion;
+                            equipmentSuggestions.innerHTML = ''; 
+                        };
+                        equipmentSuggestions.appendChild(chip);
+                    });
+                } else {
+                     equipmentSuggestions.innerHTML = `<p class="text-red-500">❌ 未能取得輔具推薦。</p>`;
+                }
+            } catch (error) {
+                equipmentSuggestions.innerHTML = `<p class="text-red-500">❌ 輔具推薦失敗：請檢查網路連線。</p>`;
+            } finally {
+                setUiState(false, recommendBtn, "✨ 推薦創意輔具");
+            }
+        });
+
+
+        // 主要點擊生成事件
+        generateBtn.addEventListener('click', async () => {
+            // 每次點擊先清除錯誤提示，防止舊錯誤干擾
+            errorMessage.classList.add('hidden');
+
+            const topic = topicSelect.value;
+            const goal = goalSelect.value;
+            const equipment = equipmentInput.value.trim();
+
+            if (!topic || !goal || !equipment) {
+                errorMessage.textContent = "請確保所有欄位（主題、目標、輔具）都已填寫或選擇！";
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            // 隱藏輔助按鈕和上次結果
+            copyBtn.classList.add('hidden');
+            notesContainer.classList.add('hidden');
+            toggleNotesBtn.classList.add('hidden');
+            
+            lastGeneratedMarkdown = ""; 
+            lastGeneratedNotes = ""; 
+            lastGeneratedMusic = "";
+            
+            // 🎯 修正點：在操作按鈕狀態前先檢查其是否存在
+            if (toggleNotesBtn) {
+                toggleNotesBtn.textContent = '⬇️ 顯示動作說明';
+                const icon = toggleNotesBtn.querySelector('.collapse-icon');
+                if(icon) icon.textContent = '⬇️';
+            }
+
+
+            // 1. 篩選資料庫 (80% 內容)
+            let filteredPlans = coreData.filter(plan => 
+                plan.topic === topic && plan.goal.includes(goal.substring(0, 4))
+            );
+
+            if (filteredPlans.length === 0) {
+                 filteredPlans = coreData.filter(plan => plan.topic === topic);
+            }
+            
+            if (filteredPlans.length === 0) {
+                filteredPlans.push(coreData.find(p => p.name === "出去玩")); 
+                errorMessage.textContent = `警告：找不到完全符合的主題與目標，已使用「${filteredPlans[0].name}」為基底教案。`;
+                errorMessage.classList.remove('hidden');
+            }
+
+            const basePlan = filteredPlans[Math.floor(Math.random() * filteredPlans.length)];
+            
+            const lessonPlanCoreData = {
+                Base_Name: basePlan.name,
+                Selected_Topic: topic,
+                Selected_Goal: goal,
+                Selected_Equipment: equipment,
+                Base_Description: basePlan.description,
+                Base_Actions: basePlan.action_set,
+                Required_Format_Rules: "暖身, 主題活動(初階/進階1-體適能/進階2-認知負荷/活動引導小技巧), 緩和運動"
+            };
+            
+            // AI 生成的系統指令
+            const systemInstruction = {
+                 parts: [{ text: `你是一位專業的「智體運動」教案設計師，請嚴格遵循以下要求：
+                    1. 根據提供的教案核心內容（Lesson Plan Core Data），將其擴充為一個完整的運動教案。
+                    2. 教案的活動創意必須有 80% 依據 Core Data，你的任務是提供 20% 的語法修飾、情境包裝和專業度提升。
+                    3. **[教案流程簡潔化要求]**：為了提升瀏覽速度，在 **# 暖身**、**## 初階活動** 和 **## 進階 1 型 (體適能)** 這三個段落中，內容**只能**包含**運動動作的標題列表**（使用 Markdown 列表 -），**嚴禁**生成任何動作的說明細節或執行要領。
+                    4. **[動作說明集中化要求]**：所有動作的操作細節、執行要領、肌群和注意事項，必須**全部**集中在 'instruction_notes' 欄位中，並以 **粗體標題** 區分。
+                    5. **[運動量嚴格結構化]**：
+                       - **初階活動 (Basic)**: 內容必須包含**4 個運動動作標題**。
+                       - **進階 1 型 (體適能)**: 必須依據初階的動作，設計**4 個延伸或強化的體適能動作標題**。
+                    6. **[輔具重構核心規則]**：如果 'Selected_Equipment' 不是 '無'，則你必須將教案的主題活動和暖身動作**完全圍繞該輔具的特性** (例如，如果輔具是報紙，活動必須是 '揉報紙'、'平衡頂報紙' 等) 進行重新設計，以達到 'Selected_Goal'。教案的動作集合應取代 Base_Actions。
+                    7. **[新格式要求]** 教案必須包含以下四個主要段落（使用 Markdown 標題）：
+                       - **# 課程主題 (4~8 字標題)**
+                       - **# 暖身**：內容必須基於主題活動的主要動作，用於低強度熱身。
+                       - **# 主題活動**：此段落必須包含四個子段落（使用 Markdown 二級標題，例如 '## 初階活動'）：
+                         - **初階活動**：基本動作練習。
+                         - **進階 1 型 (體適能)**：目標為提高體適能強度、動作組數或時間。
+                         - **進階 2 型 (認知負荷)**：目標為提高認知難度、雙重任務或反應速度（如反向指令、數字計算）。
+                         - **活動引導小技巧**：這段必須說明針對 CDR 0.5 (極輕度) 和 CDR 1 (輕度) 認知障礙患者的引導方式及引導語。
+                       - **# 緩和運動**：內容必須是體適能緩和運動和伸展。
+                    8. 必須輸出包含兩個 Markdown 字段的 JSON：
+                       a) 'lesson_plan': 完整的教案內容，使用 Markdown 格式，並包含上述所有段落。
+                       b) 'instruction_notes': 必須以**運動教練**的角度，針對教案中的所有動作，提供詳細、專業的執行要領、目標肌群、動作變化或注意事項。每個次主題標題請使用 Markdown **粗體**標示，段落間空一行。
+                    9. 輸出結果必須是 JSON 格式，包含 'lesson_plan' 和 'instruction_notes' 兩個字段。` 
+                }]
+            };
+
+            const userQuery = `請根據主題: ${topic}, 目標: ${goal}, 輔具: ${equipment}，並以核心教案「${basePlan.name}」為基底，生成一個符合指定格式的教案。`;
+            
+            const generationConfig = {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        "lesson_plan": { type: "STRING" },
+                        "instruction_notes": { type: "STRING" }
+                    },
+                    required: ["lesson_plan", "instruction_notes"]
+                }
+            };
+
+
+            // 2. 設定 UI 狀態
+            setUiState(true, generateBtn, "AI 正在生成教案中...");
+            placeholderText.classList.add('hidden');
+            generatedContent.classList.add('hidden');
+            lessonPlanOutput.innerHTML = `<div class="text-center p-8">
+                <div class="loading-animation mx-auto border-4 border-blue-200 border-t-blue-500 w-10 h-10"></div>
+                <p class="mt-4 text-blue-500">正在調用專業資料庫並進行AI創意潤飾...</p>
+            </div>`;
+
+
+            // 3. 呼叫 Gemini API 進行 20% 格式化與潤飾
+            try {
+                const result = await callStructuredApi(userQuery, generationConfig, systemInstruction);
+                
+                const text = result.lesson_plan || "";
+                const notes = result.instruction_notes || "";
+
+                // 儲存原始 Markdown 文本和註解
+                lastGeneratedMarkdown = text;
+                lastGeneratedNotes = notes;
+
+                // 4. 顯示教案主體
+                generatedContent.innerHTML = formatMarkdownToHtml(text);
+                generatedContent.classList.remove('hidden');
+                lessonPlanOutput.innerHTML = ''; // 清空 loading 提示
+                lessonPlanOutput.appendChild(generatedContent);
+
+                // 5. 顯示專業教練註解 (Instruction Notes)
+                if (notes) {
+                    notesContent.innerHTML = formatNotesMarkdownToHtml(notes);
+                    toggleNotesBtn.classList.remove('hidden');
+                    // 確保按鈕和容器被重新附加
+                    lessonPlanOutput.appendChild(toggleNotesBtn); 
+                    lessonPlanOutput.appendChild(notesContainer); 
+                }
+
+                // 6. 顯示輔助按鈕
+                copyBtn.classList.remove('hidden');
+                // 移除 recommendMusicBtn 的顯示邏輯
+
+            } catch (error) {
+                console.error("生成錯誤:", error);
+                errorMessage.textContent = error.message || "教案生成過程中發生未預期錯誤。";
+                lessonPlanOutput.innerHTML = `<p class="text-red-500 p-4">❌ 錯誤：無法生成教案。請檢查您的輸入或確認金鑰已正確設定。</p>`;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // 恢復 UI 狀態
+                setUiState(false, generateBtn, "🚀 一鍵生成教案");
+            }
+        });
+
+        // 輔助函數：將 Markdown 格式化為 HTML (教案主體)
+        function formatMarkdownToHtml(markdown) {
+            if (typeof markdown !== 'string') {
+                return '<p class="text-red-500">❌ 無法顯示教案內容，API 回傳的資料格式無效。</p>';
+            }
+
+            let html = markdown;
+            // 處理 # 標題 (主要段落: 課程主題, 暖身, 主題活動, 緩和運動)
+            html = html.replace(/^#\s*(.*)$/gm, '<h1 class="lesson-section-title">$1</h1>');
+            
+            // 處理 ## 標題 (子段落: 初階, 進階 1/2 型, 活動引導小技巧)
+            html = html.replace(/^##\s*(.*)$/gm, '<h2 class="lesson-subsection-title">$1</h2>');
+
+            // 處理粗體 (強調重點)
+            html = html.replace(/\*\*(.*?)\*\*/g, '<span class="font-extrabold text-blue-700">$1</span>');
+            
+            // 處理 活動引導小技巧 內容 (使用專門的提示框樣式)
+            html = html.replace(/(## 活動引導小技巧\s*[\s\S]*?)($|# )/g, (match, p1, p2) => {
+                const content = p1.replace(/## 活動引導小技巧\s*/, '').trim();
+                const contentHtml = content.split('\n').map(line => {
+                    if (line.trim().startsWith('- ')) {
+                        // 移除 - 符號並保留內容，使用列表樣式
+                        return `<div class="text-sm mt-1">${line.substring(2).trim()}</div>`;
+                    } else if (line.trim()) {
+                        return `<p class="mt-2 mb-1">${line.trim()}</p>`;
+                    }
+                    return '';
+                }).join('');
+
+                const finalP2 = p2 && p2.trim().startsWith('#') ? p2 : '';
+
+                return `<h2 class="lesson-subsection-title">活動引導小技巧</h2><div class="guidance-box">${contentHtml}</div>${finalP2}`;
+            });
+
+            // 處理列表 (一般步驟或注意事項)
+            html = html.replace(/^- (.*)$/gm, '<div class="lesson-list-item">$1</div>');
+            
+            // 將內容放入一個專業的容器
+            return `<div class="space-y-3 leading-relaxed">${html}</div>`;
+        }
+
+        // 輔助函數：將專業註解的 Markdown (動作說明) 格式化為 HTML
+        function formatNotesMarkdownToHtml(markdown) {
+             if (typeof markdown !== 'string') {
+                return '<p>無專業註解內容。</p>';
+            }
+            
+            let html = markdown;
+            
+            // 將所有粗體標題轉為 <strong> 並保持簡潔的 note-list-item 風格
+            html = html.replace(/^[*+-]\s*(.*)$/gm, (match, p1) => {
+                 // 找到 **粗體** 標題，並將其替換為 HTML 粗體
+                 const renderedItem = p1.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                 // 使用自定義 class 來實現每個項目之間的間隔
+                 return `<div class="note-list-item">${renderedItem}</div>`;
+            });
+            
+            // 將連續換行轉換為段落間隔
+            if (!html.includes('<div class="note-list-item"')) {
+                html = html.split('\n\n').map(p => {
+                    if (p.trim()) {
+                         return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+                    }
+                    return '';
+                }).join('');
+            }
+
+            return html;
+        }
+
+    </script>
+</body>
+</html>
